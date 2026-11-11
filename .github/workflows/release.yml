@@ -1,0 +1,33 @@
+name: Windows Release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install and test
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pytest -q
+      - name: Embed version and repository
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          "APP_VERSION = '$version'" | Set-Content app/update_config.py
+          "GITHUB_REPOSITORY = '${{ github.repository }}'" | Add-Content app/update_config.py
+      - name: Build onefile
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name MyEletricAssistent --collect-all PySide6 run.py
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create '${{ github.ref_name }}' dist/MyEletricAssistent.exe --title '${{ github.ref_name }}' --generate-notes
